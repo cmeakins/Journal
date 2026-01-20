@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Journal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen">
+      <div class="login-container">
+        <h1>Journal</h1>
+        <form id="login-form">
+          <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+          <button type="submit">Enter</button>
+        </form>
+        <p id="login-error" class="error"></p>
+      </div>
+    </div>
+
+    <!-- Journal Screen -->
+    <div id="journal-screen" class="screen hidden">
+      <header>
+        <button id="prev-day" class="nav-btn">&larr;</button>
+        <div class="date-display">
+          <input type="date" id="date-picker">
+          <span id="date-label"></span>
+        </div>
+        <button id="next-day" class="nav-btn">&rarr;</button>
+      </header>
+
+      <main>
+        <section class="entry-section">
+          <h2>What are you grateful for?</h2>
+          <textarea id="gratitude" placeholder="Today I'm grateful for..."></textarea>
+        </section>
+
+        <section class="entry-section">
+          <h2>How are you feeling?</h2>
+          <textarea id="feeling" placeholder="I'm feeling..."></textarea>
+        </section>
+
+        <section class="entry-section">
+          <h2>What's on your mind?</h2>
+          <textarea id="on-mind" placeholder="On my mind today..."></textarea>
+        </section>
+      </main>
+
+      <footer>
+        <span id="save-status"></span>
+        <a href="/logout" id="logout-link">Logout</a>
+      </footer>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

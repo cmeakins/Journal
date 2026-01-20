@@ -1,0 +1,12 @@
+services:
+  journal:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PASSWORD=your-secure-password
+      - SESSION_SECRET=generate-a-random-string
+      - PORT=3000
+    restart: unless-stopped
