@@ -15,10 +15,26 @@
       <div class="login-container">
         <h1>Journal</h1>
         <form id="login-form">
+          <input type="text" id="username" placeholder="Username" autocomplete="username" required>
           <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
-          <button type="submit">Enter</button>
+          <button type="submit">Login</button>
         </form>
         <p id="login-error" class="error"></p>
+        <p class="auth-toggle">Don't have an account? <a href="#" id="show-register">Create one</a></p>
+      </div>
+    </div>
+
+    <!-- Register Screen -->
+    <div id="register-screen" class="screen hidden">
+      <div class="login-container">
+        <h1>Journal</h1>
+        <form id="register-form">
+          <input type="text" id="reg-username" placeholder="Username" autocomplete="username" required>
+          <input type="password" id="reg-password" placeholder="Password" autocomplete="new-password" required>
+          <button type="submit">Create Account</button>
+        </form>
+        <p id="register-error" class="error"></p>
+        <p class="auth-toggle">Already have an account? <a href="#" id="show-login">Login</a></p>
       </div>
     </div>
 
@@ -52,6 +68,7 @@
 
       <footer>
         <span id="save-status"></span>
+        <span id="user-display"></span>
         <a href="/logout" id="logout-link">Logout</a>
       </footer>
     </div>

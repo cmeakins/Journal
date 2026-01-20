@@ -1,9 +1,20 @@
 (function() {
   const loginScreen = document.getElementById('login-screen');
+  const registerScreen = document.getElementById('register-screen');
   const journalScreen = document.getElementById('journal-screen');
+
   const loginForm = document.getElementById('login-form');
   const loginError = document.getElementById('login-error');
+  const usernameInput = document.getElementById('username');
   const passwordInput = document.getElementById('password');
+
+  const registerForm = document.getElementById('register-form');
+  const registerError = document.getElementById('register-error');
+  const regUsernameInput = document.getElementById('reg-username');
+  const regPasswordInput = document.getElementById('reg-password');
+
+  const showRegisterLink = document.getElementById('show-register');
+  const showLoginLink = document.getElementById('show-login');
 
   const datePicker = document.getElementById('date-picker');
   const dateLabel = document.getElementById('date-label');
@@ -14,6 +25,7 @@
   const feelingInput = document.getElementById('feeling');
   const onMindInput = document.getElementById('on-mind');
   const saveStatus = document.getElementById('save-status');
+  const userDisplay = document.getElementById('user-display');
 
   let currentDate = new Date();
   let saveTimeout = null;
@@ -38,6 +50,7 @@
 
   function showScreen(screen) {
     loginScreen.classList.add('hidden');
+    registerScreen.classList.add('hidden');
     journalScreen.classList.add('hidden');
     screen.classList.remove('hidden');
   }
@@ -47,6 +60,7 @@
       const res = await fetch('/auth-status');
       const data = await res.json();
       if (data.authenticated) {
+        userDisplay.textContent = data.username;
         showScreen(journalScreen);
         loadEntry();
       } else {
@@ -57,6 +71,20 @@
     }
   }
 
+  // Toggle between login and register screens
+  showRegisterLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    loginError.textContent = '';
+    showScreen(registerScreen);
+  });
+
+  showLoginLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    registerError.textContent = '';
+    showScreen(loginScreen);
+  });
+
+  // Login form submission
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.textContent = '';
@@ -65,18 +93,56 @@
       const res = await fetch('/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: passwordInput.value })
+        body: JSON.stringify({
+          username: usernameInput.value,
+          password: passwordInput.value
+        })
       });
 
+      const data = await res.json();
+
       if (res.ok) {
+        usernameInput.value = '';
         passwordInput.value = '';
+        userDisplay.textContent = data.username;
         showScreen(journalScreen);
         loadEntry();
       } else {
-        loginError.textContent = 'Incorrect password';
+        loginError.textContent = data.error || 'Login failed';
       }
     } catch (e) {
       loginError.textContent = 'Connection error';
+    }
+  });
+
+  // Register form submission
+  registerForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    registerError.textContent = '';
+
+    try {
+      const res = await fetch('/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: regUsernameInput.value,
+          password: regPasswordInput.value
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        regUsernameInput.value = '';
+        regPasswordInput.value = '';
+        userDisplay.textContent = data.username;
+        showScreen(journalScreen);
+        loadEntry();
+      } else {
+        registerError.textContent = data.error || 'Registration failed';
+      }
+    } catch (e) {
+      registerError.textContent = 'Connection error';
     }
   });
 
