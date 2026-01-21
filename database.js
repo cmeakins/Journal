@@ -19,52 +19,51 @@ db.exec(`
   )
 `);
 
-// Check if entries table needs migration (add user_id column)
+// Check if we need to migrate from old schema (with unique constraint on user_id, date)
 const tableInfo = db.prepare("PRAGMA table_info(entries)").all();
 const hasUserId = tableInfo.some(col => col.name === 'user_id');
 
-if (!hasUserId) {
-  // Create new entries table with user_id
+if (!hasUserId || tableInfo.length === 0) {
+  // Fresh install or old schema without user_id - create new table
+  db.exec(`DROP TABLE IF EXISTS entries`);
   db.exec(`
-    CREATE TABLE IF NOT EXISTS entries_new (
+    CREATE TABLE entries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       date TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       gratitude TEXT DEFAULT '',
       feeling TEXT DEFAULT '',
       on_mind TEXT DEFAULT '',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_id, date),
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
-
-  // Check if old entries table exists and has data
-  const oldTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='entries'").get();
-  if (oldTableExists) {
-    // Drop old table (data will be lost since we can't associate with users)
-    db.exec('DROP TABLE entries');
-  }
-
-  // Rename new table to entries
-  db.exec('ALTER TABLE entries_new RENAME TO entries');
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_user_date ON entries(user_id, date)`);
 } else {
-  // Table already has user_id, ensure it exists
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS entries (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      date TEXT NOT NULL,
-      gratitude TEXT DEFAULT '',
-      feeling TEXT DEFAULT '',
-      on_mind TEXT DEFAULT '',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_id, date),
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )
-  `);
+  // Check if old unique constraint exists by trying to find it
+  const indexInfo = db.prepare("PRAGMA index_list(entries)").all();
+  const hasUniqueConstraint = indexInfo.some(idx => idx.unique === 1 && idx.name.includes('user_id'));
+
+  if (hasUniqueConstraint) {
+    // Migrate: recreate table without unique constraint
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS entries_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        gratitude TEXT DEFAULT '',
+        feeling TEXT DEFAULT '',
+        on_mind TEXT DEFAULT '',
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `);
+    db.exec(`INSERT INTO entries_new (id, user_id, date, created_at, gratitude, feeling, on_mind)
+             SELECT id, user_id, date, created_at, gratitude, feeling, on_mind FROM entries`);
+    db.exec(`DROP TABLE entries`);
+    db.exec(`ALTER TABLE entries_new RENAME TO entries`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_user_date ON entries(user_id, date)`);
+  }
 }
 
 // User functions
@@ -78,27 +77,50 @@ function getUserByUsername(username) {
   return db.prepare('SELECT * FROM users WHERE username = ?').get(username);
 }
 
-// Entry functions (now require userId)
-function getEntry(userId, date) {
-  return db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ?').get(userId, date);
+// Entry functions
+function getEntriesByDate(userId, date) {
+  return db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY created_at ASC')
+    .all(userId, date);
 }
 
-function upsertEntry(userId, date, gratitude, feeling, onMind) {
+function getEntryById(userId, entryId) {
+  return db.prepare('SELECT * FROM entries WHERE id = ? AND user_id = ?').get(entryId, userId);
+}
+
+function createEntry(userId, date, gratitude, feeling, onMind) {
   const stmt = db.prepare(`
-    INSERT INTO entries (user_id, date, gratitude, feeling, on_mind, updated_at)
-    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(user_id, date) DO UPDATE SET
-      gratitude = excluded.gratitude,
-      feeling = excluded.feeling,
-      on_mind = excluded.on_mind,
-      updated_at = CURRENT_TIMESTAMP
+    INSERT INTO entries (user_id, date, gratitude, feeling, on_mind)
+    VALUES (?, ?, ?, ?, ?)
   `);
-  stmt.run(userId, date, gratitude, feeling, onMind);
-  return getEntry(userId, date);
+  const result = stmt.run(userId, date, gratitude, feeling, onMind);
+  return getEntryById(userId, result.lastInsertRowid);
+}
+
+function updateEntry(userId, entryId, gratitude, feeling, onMind) {
+  const stmt = db.prepare(`
+    UPDATE entries SET gratitude = ?, feeling = ?, on_mind = ?
+    WHERE id = ? AND user_id = ?
+  `);
+  stmt.run(gratitude, feeling, onMind, entryId, userId);
+  return getEntryById(userId, entryId);
+}
+
+function deleteEntry(userId, entryId) {
+  const stmt = db.prepare('DELETE FROM entries WHERE id = ? AND user_id = ?');
+  return stmt.run(entryId, userId);
 }
 
 function getAllEntryDates(userId) {
-  return db.prepare('SELECT date FROM entries WHERE user_id = ? ORDER BY date DESC').all(userId);
+  return db.prepare('SELECT DISTINCT date FROM entries WHERE user_id = ? ORDER BY date DESC').all(userId);
 }
 
-module.exports = { createUser, getUserByUsername, getEntry, upsertEntry, getAllEntryDates };
+module.exports = {
+  createUser,
+  getUserByUsername,
+  getEntriesByDate,
+  getEntryById,
+  createEntry,
+  updateEntry,
+  deleteEntry,
+  getAllEntryDates
+};

@@ -50,6 +50,28 @@
       </header>
 
       <main>
+        <div id="entries-list"></div>
+        <button id="new-entry-btn" class="new-entry-btn">+ New Entry</button>
+      </main>
+
+      <footer>
+        <span id="save-status"></span>
+        <span id="user-display"></span>
+        <a href="/logout" id="logout-link">Logout</a>
+      </footer>
+    </div>
+
+    <!-- Entry Editor Modal -->
+    <div id="entry-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span id="entry-time"></span>
+          <div class="modal-actions">
+            <button id="delete-entry-btn" class="delete-btn">Delete</button>
+            <button id="close-modal-btn" class="close-btn">&times;</button>
+          </div>
+        </div>
+
         <section class="entry-section">
           <h2>What are you grateful for?</h2>
           <textarea id="gratitude" placeholder="Today I'm grateful for..."></textarea>
@@ -64,13 +86,7 @@
           <h2>What's on your mind?</h2>
           <textarea id="on-mind" placeholder="On my mind today..."></textarea>
         </section>
-      </main>
-
-      <footer>
-        <span id="save-status"></span>
-        <span id="user-display"></span>
-        <a href="/logout" id="logout-link">Logout</a>
-      </footer>
+      </div>
     </div>
   </div>
 

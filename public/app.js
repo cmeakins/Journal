@@ -21,13 +21,22 @@
   const prevDayBtn = document.getElementById('prev-day');
   const nextDayBtn = document.getElementById('next-day');
 
-  const gratitudeInput = document.getElementById('gratitude');
-  const feelingInput = document.getElementById('feeling');
-  const onMindInput = document.getElementById('on-mind');
+  const entriesList = document.getElementById('entries-list');
+  const newEntryBtn = document.getElementById('new-entry-btn');
   const saveStatus = document.getElementById('save-status');
   const userDisplay = document.getElementById('user-display');
 
+  // Modal elements
+  const entryModal = document.getElementById('entry-modal');
+  const entryTime = document.getElementById('entry-time');
+  const deleteEntryBtn = document.getElementById('delete-entry-btn');
+  const closeModalBtn = document.getElementById('close-modal-btn');
+  const gratitudeInput = document.getElementById('gratitude');
+  const feelingInput = document.getElementById('feeling');
+  const onMindInput = document.getElementById('on-mind');
+
   let currentDate = new Date();
+  let currentEntryId = null;
   let saveTimeout = null;
 
   function formatDate(date) {
@@ -48,6 +57,11 @@
     return date.toLocaleDateString('en-US', options);
   }
 
+  function formatTime(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
   function showScreen(screen) {
     loginScreen.classList.add('hidden');
     registerScreen.classList.add('hidden');
@@ -62,7 +76,7 @@
       if (data.authenticated) {
         userDisplay.textContent = data.username;
         showScreen(journalScreen);
-        loadEntry();
+        loadEntries();
       } else {
         showScreen(loginScreen);
       }
@@ -106,7 +120,7 @@
         passwordInput.value = '';
         userDisplay.textContent = data.username;
         showScreen(journalScreen);
-        loadEntry();
+        loadEntries();
       } else {
         loginError.textContent = data.error || 'Login failed';
       }
@@ -137,7 +151,7 @@
         regPasswordInput.value = '';
         userDisplay.textContent = data.username;
         showScreen(journalScreen);
-        loadEntry();
+        loadEntries();
       } else {
         registerError.textContent = data.error || 'Registration failed';
       }
@@ -146,30 +160,102 @@
     }
   });
 
-  async function loadEntry() {
+  // Load entries for current date
+  async function loadEntries() {
     const dateStr = formatDate(currentDate);
     datePicker.value = dateStr;
     dateLabel.textContent = formatDisplayDate(currentDate);
 
     try {
-      const res = await fetch(`/api/entry/${dateStr}`);
+      const res = await fetch(`/api/entries/${dateStr}`);
       if (res.ok) {
-        const entry = await res.json();
-        gratitudeInput.value = entry.gratitude || '';
-        feelingInput.value = entry.feeling || '';
-        onMindInput.value = entry.on_mind || '';
+        const entries = await res.json();
+        renderEntries(entries);
       }
     } catch (e) {
-      console.error('Failed to load entry:', e);
+      console.error('Failed to load entries:', e);
     }
   }
 
-  async function saveEntry() {
+  function renderEntries(entries) {
+    entriesList.innerHTML = '';
+
+    if (entries.length === 0) {
+      entriesList.innerHTML = '<p class="no-entries">No entries yet. Click "+ New Entry" to start writing.</p>';
+      return;
+    }
+
+    entries.forEach(entry => {
+      const card = document.createElement('div');
+      card.className = 'entry-card';
+      card.dataset.id = entry.id;
+
+      const time = formatTime(entry.created_at);
+      const preview = getPreview(entry);
+
+      card.innerHTML = `
+        <div class="entry-card-time">${time}</div>
+        <div class="entry-card-preview">${preview}</div>
+      `;
+
+      card.addEventListener('click', () => openEntry(entry));
+      entriesList.appendChild(card);
+    });
+  }
+
+  function getPreview(entry) {
+    const text = entry.gratitude || entry.feeling || entry.on_mind || '';
+    if (!text) return '<em>Empty entry</em>';
+    const truncated = text.substring(0, 100);
+    return truncated + (text.length > 100 ? '...' : '');
+  }
+
+  // Open entry in modal
+  function openEntry(entry) {
+    currentEntryId = entry.id;
+    entryTime.textContent = formatTime(entry.created_at);
+    gratitudeInput.value = entry.gratitude || '';
+    feelingInput.value = entry.feeling || '';
+    onMindInput.value = entry.on_mind || '';
+    deleteEntryBtn.classList.remove('hidden');
+    entryModal.classList.remove('hidden');
+  }
+
+  // Create new entry
+  async function createNewEntry() {
     const dateStr = formatDate(currentDate);
+
+    try {
+      const res = await fetch('/api/entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      if (res.ok) {
+        const entry = await res.json();
+        currentEntryId = entry.id;
+        entryTime.textContent = formatTime(entry.created_at);
+        gratitudeInput.value = '';
+        feelingInput.value = '';
+        onMindInput.value = '';
+        deleteEntryBtn.classList.remove('hidden');
+        entryModal.classList.remove('hidden');
+        loadEntries();
+      }
+    } catch (e) {
+      console.error('Failed to create entry:', e);
+    }
+  }
+
+  // Save current entry
+  async function saveEntry() {
+    if (!currentEntryId) return;
+
     saveStatus.textContent = 'Saving...';
 
     try {
-      const res = await fetch(`/api/entry/${dateStr}`, {
+      const res = await fetch(`/api/entry/${currentEntryId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -181,6 +267,7 @@
 
       if (res.ok) {
         saveStatus.textContent = 'Saved';
+        loadEntries();
         setTimeout(() => {
           if (saveStatus.textContent === 'Saved') {
             saveStatus.textContent = '';
@@ -192,11 +279,46 @@
     }
   }
 
+  // Delete current entry
+  async function deleteEntry() {
+    if (!currentEntryId) return;
+
+    if (!confirm('Delete this entry?')) return;
+
+    try {
+      const res = await fetch(`/api/entry/${currentEntryId}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        closeModal();
+        loadEntries();
+      }
+    } catch (e) {
+      console.error('Failed to delete entry:', e);
+    }
+  }
+
+  function closeModal() {
+    entryModal.classList.add('hidden');
+    currentEntryId = null;
+    saveStatus.textContent = '';
+  }
+
   function scheduleAutoSave() {
     if (saveTimeout) clearTimeout(saveTimeout);
     saveStatus.textContent = '';
     saveTimeout = setTimeout(saveEntry, 1000);
   }
+
+  // Event listeners
+  newEntryBtn.addEventListener('click', createNewEntry);
+  deleteEntryBtn.addEventListener('click', deleteEntry);
+  closeModalBtn.addEventListener('click', closeModal);
+
+  entryModal.addEventListener('click', (e) => {
+    if (e.target === entryModal) closeModal();
+  });
 
   [gratitudeInput, feelingInput, onMindInput].forEach(input => {
     input.addEventListener('input', scheduleAutoSave);
@@ -204,17 +326,17 @@
 
   prevDayBtn.addEventListener('click', () => {
     currentDate.setDate(currentDate.getDate() - 1);
-    loadEntry();
+    loadEntries();
   });
 
   nextDayBtn.addEventListener('click', () => {
     currentDate.setDate(currentDate.getDate() + 1);
-    loadEntry();
+    loadEntries();
   });
 
   datePicker.addEventListener('change', () => {
     currentDate = new Date(datePicker.value + 'T12:00:00');
-    loadEntry();
+    loadEntries();
   });
 
   // Initialize

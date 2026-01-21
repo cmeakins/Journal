@@ -102,17 +102,43 @@ app.get('/auth-status', (req, res) => {
 });
 
 // API routes
-app.get('/api/entry/:date', requireAuth, (req, res) => {
-  const entry = db.getEntry(req.session.userId, req.params.date);
-  res.json(entry || { date: req.params.date, gratitude: '', feeling: '', on_mind: '' });
+
+// Get all entries for a date
+app.get('/api/entries/:date', requireAuth, (req, res) => {
+  const entries = db.getEntriesByDate(req.session.userId, req.params.date);
+  res.json(entries);
 });
 
-app.put('/api/entry/:date', requireAuth, (req, res) => {
-  const { gratitude, feeling, on_mind } = req.body;
-  const entry = db.upsertEntry(req.session.userId, req.params.date, gratitude || '', feeling || '', on_mind || '');
+// Create a new entry
+app.post('/api/entry', requireAuth, (req, res) => {
+  const { date, gratitude, feeling, on_mind } = req.body;
+  if (!date) {
+    return res.status(400).json({ error: 'Date is required' });
+  }
+  const entry = db.createEntry(req.session.userId, date, gratitude || '', feeling || '', on_mind || '');
   res.json(entry);
 });
 
+// Update an entry by id
+app.put('/api/entry/:id', requireAuth, (req, res) => {
+  const { gratitude, feeling, on_mind } = req.body;
+  const entry = db.updateEntry(req.session.userId, req.params.id, gratitude || '', feeling || '', on_mind || '');
+  if (!entry) {
+    return res.status(404).json({ error: 'Entry not found' });
+  }
+  res.json(entry);
+});
+
+// Delete an entry by id
+app.delete('/api/entry/:id', requireAuth, (req, res) => {
+  const result = db.deleteEntry(req.session.userId, req.params.id);
+  if (result.changes === 0) {
+    return res.status(404).json({ error: 'Entry not found' });
+  }
+  res.json({ success: true });
+});
+
+// Get all dates that have entries
 app.get('/api/entries', requireAuth, (req, res) => {
   const entries = db.getAllEntryDates(req.session.userId);
   res.json(entries);
