@@ -210,7 +210,7 @@
     return truncated + (text.length > 100 ? '...' : '');
   }
 
-  // Open entry in modal
+  // Open existing entry in modal
   function openEntry(entry) {
     currentEntryId = entry.id;
     entryTime.textContent = formatTime(entry.created_at);
@@ -221,49 +221,52 @@
     entryModal.classList.remove('hidden');
   }
 
-  // Create new entry
-  async function createNewEntry() {
-    const dateStr = formatDate(currentDate);
-
-    try {
-      const res = await fetch('/api/entry', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
-      });
-
-      if (res.ok) {
-        const entry = await res.json();
-        currentEntryId = entry.id;
-        entryTime.textContent = formatTime(entry.created_at);
-        gratitudeInput.value = '';
-        feelingInput.value = '';
-        onMindInput.value = '';
-        deleteEntryBtn.classList.remove('hidden');
-        entryModal.classList.remove('hidden');
-        loadEntries();
-      }
-    } catch (e) {
-      console.error('Failed to create entry:', e);
-    }
+  // Open modal for new entry (doesn't create in DB until save)
+  function openNewEntry() {
+    currentEntryId = null;
+    entryTime.textContent = 'New Entry';
+    gratitudeInput.value = '';
+    feelingInput.value = '';
+    onMindInput.value = '';
+    deleteEntryBtn.classList.add('hidden');
+    entryModal.classList.remove('hidden');
   }
 
-  // Save current entry
+  // Save entry (create if new, update if existing)
   async function saveEntry() {
-    if (!currentEntryId) return;
-
     saveStatus.textContent = 'Saving...';
 
     try {
-      const res = await fetch(`/api/entry/${currentEntryId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gratitude: gratitudeInput.value,
-          feeling: feelingInput.value,
-          on_mind: onMindInput.value
-        })
-      });
+      let res;
+      if (currentEntryId) {
+        // Update existing entry
+        res = await fetch(`/api/entry/${currentEntryId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gratitude: gratitudeInput.value,
+            feeling: feelingInput.value,
+            on_mind: onMindInput.value
+          })
+        });
+      } else {
+        // Create new entry
+        res = await fetch('/api/entry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: formatDate(currentDate),
+            gratitude: gratitudeInput.value,
+            feeling: feelingInput.value,
+            on_mind: onMindInput.value
+          })
+        });
+        if (res.ok) {
+          const entry = await res.json();
+          currentEntryId = entry.id;
+          deleteEntryBtn.classList.remove('hidden');
+        }
+      }
 
       if (res.ok) {
         saveStatus.textContent = 'Saved';
@@ -273,6 +276,8 @@
             saveStatus.textContent = '';
           }
         }, 2000);
+      } else {
+        saveStatus.textContent = 'Save failed';
       }
     } catch (e) {
       saveStatus.textContent = 'Save failed';
@@ -306,7 +311,7 @@
   }
 
   // Event listeners
-  newEntryBtn.addEventListener('click', createNewEntry);
+  newEntryBtn.addEventListener('click', openNewEntry);
   saveEntryBtn.addEventListener('click', saveEntry);
   deleteEntryBtn.addEventListener('click', deleteEntry);
   closeModalBtn.addEventListener('click', closeModal);
