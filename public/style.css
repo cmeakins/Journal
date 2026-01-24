@@ -346,6 +346,22 @@ footer {
   gap: 0.5rem;
 }
 
+.save-btn {
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.save-btn:hover {
+  background: var(--accent-hover);
+}
+
 .delete-btn {
   padding: 0.5rem 1rem;
   background: transparent;

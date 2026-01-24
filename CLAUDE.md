@@ -46,7 +46,6 @@ Each journal entry has three sections:
 - Multi-user accounts (register/login with username + password)
 - Private entries per user
 - Multiple entries per day with timestamps
-- Auto-save as you type
 - Date navigation (prev/next buttons, date picker)
 - Modal editor for entries
 - Delete entries

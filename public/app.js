@@ -29,6 +29,7 @@
   // Modal elements
   const entryModal = document.getElementById('entry-modal');
   const entryTime = document.getElementById('entry-time');
+  const saveEntryBtn = document.getElementById('save-entry-btn');
   const deleteEntryBtn = document.getElementById('delete-entry-btn');
   const closeModalBtn = document.getElementById('close-modal-btn');
   const gratitudeInput = document.getElementById('gratitude');
@@ -37,7 +38,6 @@
 
   let currentDate = new Date();
   let currentEntryId = null;
-  let saveTimeout = null;
 
   function formatDate(date) {
     return date.toISOString().split('T')[0];
@@ -305,23 +305,14 @@
     saveStatus.textContent = '';
   }
 
-  function scheduleAutoSave() {
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveStatus.textContent = '';
-    saveTimeout = setTimeout(saveEntry, 1000);
-  }
-
   // Event listeners
   newEntryBtn.addEventListener('click', createNewEntry);
+  saveEntryBtn.addEventListener('click', saveEntry);
   deleteEntryBtn.addEventListener('click', deleteEntry);
   closeModalBtn.addEventListener('click', closeModal);
 
   entryModal.addEventListener('click', (e) => {
     if (e.target === entryModal) closeModal();
-  });
-
-  [gratitudeInput, feelingInput, onMindInput].forEach(input => {
-    input.addEventListener('input', scheduleAutoSave);
   });
 
   prevDayBtn.addEventListener('click', () => {
