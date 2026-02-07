@@ -45,11 +45,13 @@
   const timelineList = document.getElementById('timeline-list');
 
   const mainArea = document.getElementById('main-area');
+  const greetingEl = document.getElementById('greeting');
 
   let currentDate = new Date();
   let currentEntryId = null;
   let isDirty = false;
   let deleteTimeout = null;
+  let currentUsername = '';
 
   // --- Utility functions ---
 
@@ -104,6 +106,24 @@
     isDirty = true;
   }
 
+  function getGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  function updateGreeting() {
+    const isToday = formatDate(currentDate) === formatDate(new Date());
+    if (isToday && currentUsername) {
+      const fullDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      greetingEl.innerHTML = `<h2>${getGreeting()}, ${currentUsername}</h2><p>${fullDate}</p>`;
+      greetingEl.style.display = '';
+    } else {
+      greetingEl.style.display = 'none';
+    }
+  }
+
   // --- Auth ---
 
   async function checkAuth() {
@@ -111,6 +131,7 @@
       const res = await fetch('/auth-status');
       const data = await res.json();
       if (data.authenticated) {
+        currentUsername = data.username;
         userDisplay.textContent = data.username;
         showScreen(journalScreen);
         loadEntries();
@@ -156,6 +177,7 @@
       const data = await res.json();
 
       if (res.ok) {
+        currentUsername = data.username;
         usernameInput.value = '';
         passwordInput.value = '';
         userDisplay.textContent = data.username;
@@ -193,6 +215,7 @@
       const data = await res.json();
 
       if (res.ok) {
+        currentUsername = data.username;
         regUsernameInput.value = '';
         regPasswordInput.value = '';
         userDisplay.textContent = data.username;
@@ -223,6 +246,8 @@
       todayBtn.classList.remove('hidden');
     }
 
+    updateGreeting();
+
     // Show loading state
     entriesList.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
 
@@ -247,6 +272,7 @@
           <div class="no-entries-icon">&#9997;&#65039;</div>
           <h3>No entries yet</h3>
           <p>Start writing to capture your thoughts for today.</p>
+          <button class="no-entries-cta" onclick="document.getElementById('new-entry-btn').click()">Write an entry</button>
         </div>
       `;
       return;
@@ -479,12 +505,25 @@
       return;
     }
 
+    let currentMonth = '';
+
     dates.forEach(item => {
+      const d = new Date(item.date + 'T12:00:00');
+      const monthKey = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+      // Add month header if new month
+      if (monthKey !== currentMonth) {
+        currentMonth = monthKey;
+        const monthEl = document.createElement('div');
+        monthEl.className = 'timeline-month';
+        monthEl.textContent = monthKey;
+        timelineList.appendChild(monthEl);
+      }
+
       const el = document.createElement('div');
       el.className = 'timeline-date';
 
-      const d = new Date(item.date + 'T12:00:00');
-      const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      const label = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
 
       el.innerHTML = `
         <span class="timeline-date-label">${label}</span>

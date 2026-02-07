@@ -14,6 +14,7 @@
     <div id="login-screen" class="screen">
       <div class="login-container">
         <h1>Journal</h1>
+        <p class="login-subtitle">Your daily reflection space</p>
         <form id="login-form">
           <input type="text" id="username" placeholder="Username" autocomplete="username" required>
           <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
@@ -28,6 +29,7 @@
     <div id="register-screen" class="screen hidden">
       <div class="login-container">
         <h1>Journal</h1>
+        <p class="login-subtitle">Start your journaling journey</p>
         <form id="register-form">
           <input type="text" id="reg-username" placeholder="Username" autocomplete="username" required>
           <input type="password" id="reg-password" placeholder="Password" autocomplete="new-password" required>
@@ -51,6 +53,7 @@
       </header>
 
       <main id="main-area">
+        <div id="greeting" class="greeting"></div>
         <div id="entries-list"></div>
         <button id="new-entry-btn" class="new-entry-btn"><span class="new-entry-full">+ New Entry</span><span class="new-entry-fab">+</span></button>
       </main>
