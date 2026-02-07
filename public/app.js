@@ -20,6 +20,7 @@
   const dateLabel = document.getElementById('date-label');
   const prevDayBtn = document.getElementById('prev-day');
   const nextDayBtn = document.getElementById('next-day');
+  const todayBtn = document.getElementById('today-btn');
 
   const entriesList = document.getElementById('entries-list');
   const newEntryBtn = document.getElementById('new-entry-btn');
@@ -32,12 +33,25 @@
   const saveEntryBtn = document.getElementById('save-entry-btn');
   const deleteEntryBtn = document.getElementById('delete-entry-btn');
   const closeModalBtn = document.getElementById('close-modal-btn');
+  const copyEntryBtn = document.getElementById('copy-entry-btn');
   const gratitudeInput = document.getElementById('gratitude');
   const feelingInput = document.getElementById('feeling');
   const onMindInput = document.getElementById('on-mind');
 
+  // Timeline elements
+  const timelineBtn = document.getElementById('timeline-btn');
+  const timelinePanel = document.getElementById('timeline-panel');
+  const closeTimelineBtn = document.getElementById('close-timeline-btn');
+  const timelineList = document.getElementById('timeline-list');
+
+  const mainArea = document.getElementById('main-area');
+
   let currentDate = new Date();
   let currentEntryId = null;
+  let isDirty = false;
+  let deleteTimeout = null;
+
+  // --- Utility functions ---
 
   function formatDate(date) {
     return date.toISOString().split('T')[0];
@@ -68,6 +82,29 @@
     journalScreen.classList.add('hidden');
     screen.classList.remove('hidden');
   }
+
+  function showToast(message) {
+    let toast = document.querySelector('.toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.className = 'toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  }
+
+  function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  }
+
+  function markDirty() {
+    isDirty = true;
+  }
+
+  // --- Auth ---
 
   async function checkAuth() {
     try {
@@ -102,6 +139,9 @@
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.textContent = '';
+    const btn = loginForm.querySelector('button');
+    btn.textContent = 'Logging in...';
+    btn.disabled = true;
 
     try {
       const res = await fetch('/login', {
@@ -126,6 +166,9 @@
       }
     } catch (e) {
       loginError.textContent = 'Connection error';
+    } finally {
+      btn.textContent = 'Login';
+      btn.disabled = false;
     }
   });
 
@@ -133,6 +176,9 @@
   registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     registerError.textContent = '';
+    const btn = registerForm.querySelector('button');
+    btn.textContent = 'Creating account...';
+    btn.disabled = true;
 
     try {
       const res = await fetch('/register', {
@@ -157,14 +203,28 @@
       }
     } catch (e) {
       registerError.textContent = 'Connection error';
+    } finally {
+      btn.textContent = 'Create Account';
+      btn.disabled = false;
     }
   });
 
-  // Load entries for current date
+  // --- Entries ---
+
   async function loadEntries() {
     const dateStr = formatDate(currentDate);
     datePicker.value = dateStr;
     dateLabel.textContent = formatDisplayDate(currentDate);
+
+    // Show/hide today button
+    if (formatDate(currentDate) === formatDate(new Date())) {
+      todayBtn.classList.add('hidden');
+    } else {
+      todayBtn.classList.remove('hidden');
+    }
+
+    // Show loading state
+    entriesList.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
 
     try {
       const res = await fetch(`/api/entries/${dateStr}`);
@@ -174,6 +234,7 @@
       }
     } catch (e) {
       console.error('Failed to load entries:', e);
+      entriesList.innerHTML = '';
     }
   }
 
@@ -181,14 +242,21 @@
     entriesList.innerHTML = '';
 
     if (entries.length === 0) {
-      entriesList.innerHTML = '<p class="no-entries">No entries yet. Click "+ New Entry" to start writing.</p>';
+      entriesList.innerHTML = `
+        <div class="no-entries">
+          <div class="no-entries-icon">&#9997;&#65039;</div>
+          <h3>No entries yet</h3>
+          <p>Start writing to capture your thoughts for today.</p>
+        </div>
+      `;
       return;
     }
 
-    entries.forEach(entry => {
+    entries.forEach((entry, index) => {
       const card = document.createElement('div');
       card.className = 'entry-card';
       card.dataset.id = entry.id;
+      card.style.animationDelay = `${index * 0.05}s`;
 
       const time = formatTime(entry.created_at);
       const preview = getPreview(entry);
@@ -204,13 +272,35 @@
   }
 
   function getPreview(entry) {
-    const text = entry.gratitude || entry.feeling || entry.on_mind || '';
-    if (!text) return '<em>Empty entry</em>';
-    const truncated = text.substring(0, 100);
-    return truncated + (text.length > 100 ? '...' : '');
+    const parts = [];
+    if (entry.gratitude) parts.push(entry.gratitude.substring(0, 60));
+    if (entry.feeling) parts.push(entry.feeling.substring(0, 60));
+    if (entry.on_mind) parts.push(entry.on_mind.substring(0, 60));
+    if (parts.length === 0) return '<em>Empty entry</em>';
+    return parts.join(' &middot; ');
   }
 
-  // Open existing entry in modal
+  // --- Modal ---
+
+  function openModal() {
+    entryModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    isDirty = false;
+    resetDeleteBtn();
+  }
+
+  function closeModal() {
+    if (isDirty) {
+      if (!confirm('You have unsaved changes. Discard?')) return;
+    }
+    entryModal.classList.remove('active');
+    document.body.style.overflow = '';
+    currentEntryId = null;
+    saveStatus.textContent = '';
+    isDirty = false;
+    resetDeleteBtn();
+  }
+
   function openEntry(entry) {
     currentEntryId = entry.id;
     entryTime.textContent = formatTime(entry.created_at);
@@ -218,10 +308,11 @@
     feelingInput.value = entry.feeling || '';
     onMindInput.value = entry.on_mind || '';
     deleteEntryBtn.classList.remove('hidden');
-    entryModal.classList.remove('hidden');
+    openModal();
+    // Auto-resize textareas to fit content
+    [gratitudeInput, feelingInput, onMindInput].forEach(autoResize);
   }
 
-  // Open modal for new entry (doesn't create in DB until save)
   function openNewEntry() {
     currentEntryId = null;
     entryTime.textContent = 'New Entry';
@@ -229,17 +320,22 @@
     feelingInput.value = '';
     onMindInput.value = '';
     deleteEntryBtn.classList.add('hidden');
-    entryModal.classList.remove('hidden');
+    openModal();
+    // Reset textarea heights
+    [gratitudeInput, feelingInput, onMindInput].forEach(ta => {
+      ta.style.height = 'auto';
+    });
   }
 
-  // Save entry (create if new, update if existing)
+  // --- Save ---
+
   async function saveEntry() {
-    saveStatus.textContent = 'Saving...';
+    saveEntryBtn.textContent = 'Saving...';
+    saveEntryBtn.disabled = true;
 
     try {
       let res;
       if (currentEntryId) {
-        // Update existing entry
         res = await fetch(`/api/entry/${currentEntryId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -250,7 +346,6 @@
           })
         });
       } else {
-        // Create new entry
         res = await fetch('/api/entry', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -269,33 +364,43 @@
       }
 
       if (res.ok) {
-        saveStatus.textContent = 'Saved';
+        isDirty = false;
+        saveEntryBtn.textContent = 'Saved!';
+        saveEntryBtn.classList.add('saved');
         loadEntries();
         setTimeout(() => {
-          if (saveStatus.textContent === 'Saved') {
-            saveStatus.textContent = '';
-          }
-        }, 2000);
+          saveEntryBtn.textContent = 'Save';
+          saveEntryBtn.classList.remove('saved');
+        }, 1500);
       } else {
-        saveStatus.textContent = 'Save failed';
+        saveEntryBtn.textContent = 'Failed';
+        setTimeout(() => { saveEntryBtn.textContent = 'Save'; }, 2000);
       }
     } catch (e) {
-      saveStatus.textContent = 'Save failed';
+      saveEntryBtn.textContent = 'Failed';
+      setTimeout(() => { saveEntryBtn.textContent = 'Save'; }, 2000);
+    } finally {
+      saveEntryBtn.disabled = false;
     }
   }
 
-  // Delete current entry
-  async function deleteEntry() {
+  // --- Delete with inline confirmation ---
+
+  function resetDeleteBtn() {
+    if (deleteTimeout) clearTimeout(deleteTimeout);
+    deleteEntryBtn.textContent = 'Delete';
+    deleteEntryBtn.classList.remove('confirming');
+    deleteEntryBtn.dataset.confirming = 'false';
+  }
+
+  async function performDelete() {
     if (!currentEntryId) return;
-
-    if (!confirm('Delete this entry?')) return;
-
     try {
       const res = await fetch(`/api/entry/${currentEntryId}`, {
         method: 'DELETE'
       });
-
       if (res.ok) {
+        isDirty = false;
         closeModal();
         loadEntries();
       }
@@ -304,17 +409,162 @@
     }
   }
 
-  function closeModal() {
-    entryModal.classList.add('hidden');
-    currentEntryId = null;
-    saveStatus.textContent = '';
+  function handleDelete() {
+    if (deleteEntryBtn.dataset.confirming === 'true') {
+      clearTimeout(deleteTimeout);
+      resetDeleteBtn();
+      performDelete();
+    } else {
+      deleteEntryBtn.dataset.confirming = 'true';
+      deleteEntryBtn.textContent = 'Confirm?';
+      deleteEntryBtn.classList.add('confirming');
+      deleteTimeout = setTimeout(resetDeleteBtn, 3000);
+    }
   }
 
-  // Event listeners
+  // --- Copy to clipboard ---
+
+  function copyEntry() {
+    const lines = [];
+    if (gratitudeInput.value) lines.push('Grateful for: ' + gratitudeInput.value);
+    if (feelingInput.value) lines.push('Feeling: ' + feelingInput.value);
+    if (onMindInput.value) lines.push('On my mind: ' + onMindInput.value);
+    const text = lines.join('\n\n');
+    if (!text) {
+      showToast('Nothing to copy');
+      return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Copied to clipboard');
+    }).catch(() => {
+      showToast('Failed to copy');
+    });
+  }
+
+  // --- Timeline ---
+
+  async function openTimeline() {
+    timelinePanel.classList.remove('hidden');
+    // Small delay so the hidden→visible transition can trigger
+    requestAnimationFrame(() => {
+      timelinePanel.classList.add('active');
+    });
+    document.body.style.overflow = 'hidden';
+    timelineList.innerHTML = '<div class="timeline-loading"><div class="spinner"></div></div>';
+
+    try {
+      const res = await fetch('/api/entries');
+      if (res.ok) {
+        const dates = await res.json();
+        renderTimeline(dates);
+      }
+    } catch (e) {
+      timelineList.innerHTML = '<div class="timeline-loading">Failed to load</div>';
+    }
+  }
+
+  function closeTimeline() {
+    timelinePanel.classList.remove('active');
+    document.body.style.overflow = '';
+    setTimeout(() => {
+      timelinePanel.classList.add('hidden');
+    }, 300);
+  }
+
+  function renderTimeline(dates) {
+    timelineList.innerHTML = '';
+
+    if (dates.length === 0) {
+      timelineList.innerHTML = '<div class="timeline-loading">No entries yet</div>';
+      return;
+    }
+
+    dates.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'timeline-date';
+
+      const d = new Date(item.date + 'T12:00:00');
+      const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
+      el.innerHTML = `
+        <span class="timeline-date-label">${label}</span>
+        <span class="timeline-date-count">${item.count}</span>
+      `;
+
+      el.addEventListener('click', () => {
+        currentDate = new Date(item.date + 'T12:00:00');
+        loadEntries();
+        closeTimeline();
+      });
+
+      timelineList.appendChild(el);
+    });
+  }
+
+  // --- Swipe navigation ---
+
+  let touchStartX = 0;
+  let touchEndX = 0;
+
+  mainArea.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+  }, { passive: true });
+
+  mainArea.addEventListener('touchend', (e) => {
+    touchEndX = e.changedTouches[0].screenX;
+    const diff = touchStartX - touchEndX;
+    if (Math.abs(diff) > 80) {
+      if (diff > 0) {
+        currentDate.setDate(currentDate.getDate() + 1);
+      } else {
+        currentDate.setDate(currentDate.getDate() - 1);
+      }
+      loadEntries();
+    }
+  }, { passive: true });
+
+  // --- Textarea auto-resize and dirty tracking ---
+
+  [gratitudeInput, feelingInput, onMindInput].forEach(ta => {
+    ta.addEventListener('input', () => {
+      autoResize(ta);
+      markDirty();
+    });
+  });
+
+  // --- Keyboard shortcuts ---
+
+  document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd+S to save when modal is open
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      if (entryModal.classList.contains('active')) {
+        e.preventDefault();
+        saveEntry();
+      }
+    }
+    // Escape to close modal or timeline
+    if (e.key === 'Escape') {
+      if (entryModal.classList.contains('active')) {
+        closeModal();
+      } else if (timelinePanel.classList.contains('active')) {
+        closeTimeline();
+      }
+    }
+  });
+
+  // --- Event listeners ---
+
   newEntryBtn.addEventListener('click', openNewEntry);
   saveEntryBtn.addEventListener('click', saveEntry);
-  deleteEntryBtn.addEventListener('click', deleteEntry);
+  deleteEntryBtn.addEventListener('click', handleDelete);
   closeModalBtn.addEventListener('click', closeModal);
+  copyEntryBtn.addEventListener('click', copyEntry);
+
+  timelineBtn.addEventListener('click', openTimeline);
+  closeTimelineBtn.addEventListener('click', closeTimeline);
+  timelinePanel.addEventListener('click', (e) => {
+    if (e.target === timelinePanel) closeTimeline();
+  });
 
   entryModal.addEventListener('click', (e) => {
     if (e.target === entryModal) closeModal();
@@ -327,6 +577,11 @@
 
   nextDayBtn.addEventListener('click', () => {
     currentDate.setDate(currentDate.getDate() + 1);
+    loadEntries();
+  });
+
+  todayBtn.addEventListener('click', () => {
+    currentDate = new Date();
     loadEntries();
   });
 

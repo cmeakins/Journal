@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>Journal</title>
@@ -41,34 +41,48 @@
     <!-- Journal Screen -->
     <div id="journal-screen" class="screen hidden">
       <header>
-        <button id="prev-day" class="nav-btn">&larr;</button>
+        <button id="prev-day" class="nav-btn" title="Previous day">&larr;</button>
         <div class="date-display">
           <input type="date" id="date-picker">
           <span id="date-label"></span>
+          <button id="today-btn" class="today-btn hidden" title="Jump to today">Today</button>
         </div>
-        <button id="next-day" class="nav-btn">&rarr;</button>
+        <button id="next-day" class="nav-btn" title="Next day">&rarr;</button>
       </header>
 
-      <main>
+      <main id="main-area">
         <div id="entries-list"></div>
-        <button id="new-entry-btn" class="new-entry-btn">+ New Entry</button>
+        <button id="new-entry-btn" class="new-entry-btn"><span class="new-entry-full">+ New Entry</span><span class="new-entry-fab">+</span></button>
       </main>
 
       <footer>
         <span id="save-status"></span>
         <span id="user-display"></span>
+        <button id="timeline-btn" class="timeline-btn" title="All entries">Timeline</button>
         <a href="/logout" id="logout-link">Logout</a>
       </footer>
     </div>
 
+    <!-- Timeline Panel -->
+    <div id="timeline-panel" class="timeline-panel hidden">
+      <div class="timeline-panel-content">
+        <div class="timeline-header">
+          <h2>Timeline</h2>
+          <button id="close-timeline-btn" class="close-btn">&times;</button>
+        </div>
+        <div id="timeline-list" class="timeline-list"></div>
+      </div>
+    </div>
+
     <!-- Entry Editor Modal -->
-    <div id="entry-modal" class="modal hidden">
+    <div id="entry-modal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
           <span id="entry-time"></span>
           <div class="modal-actions">
+            <button id="copy-entry-btn" class="copy-btn" title="Copy to clipboard">Copy</button>
             <button id="save-entry-btn" class="save-btn">Save</button>
-            <button id="delete-entry-btn" class="delete-btn">Delete</button>
+            <button id="delete-entry-btn" class="delete-btn hidden">Delete</button>
             <button id="close-modal-btn" class="close-btn">&times;</button>
           </div>
         </div>

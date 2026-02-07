@@ -111,7 +111,7 @@ function deleteEntry(userId, entryId) {
 }
 
 function getAllEntryDates(userId) {
-  return db.prepare('SELECT DISTINCT date FROM entries WHERE user_id = ? ORDER BY date DESC').all(userId);
+  return db.prepare('SELECT date, COUNT(*) as count FROM entries WHERE user_id = ? GROUP BY date ORDER BY date DESC').all(userId);
 }
 
 module.exports = {
